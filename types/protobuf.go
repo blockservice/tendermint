@@ -33,7 +33,7 @@ var TM2PB = tm2pb{}
 
 type tm2pb struct{}
 
-func (tm2pb) Header(header *Header) abci.Header {
+func (t tm2pb) Header(header *Header, proposer *Validator) abci.Header {
 	return abci.Header{
 		ChainID: header.ChainID,
 		Height:  header.Height,
@@ -46,12 +46,15 @@ func (tm2pb) Header(header *Header) abci.Header {
 		ValidatorsHash: header.ValidatorsHash,
 		AppHash:        header.AppHash,
 
-		// Proposer: TODO
+		Proposer: t.Validator(proposer),
 	}
 }
 
 // XXX: panics on unknown pubkey type
 func (tm2pb) Validator(val *Validator) abci.Validator {
+	if val == nil {
+		return abci.Validator{}
+	}
 	return abci.Validator{
 		Address: val.PubKey.Address(),
 		PubKey:  TM2PB.PubKey(val.PubKey),

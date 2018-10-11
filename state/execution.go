@@ -73,7 +73,7 @@ func (blockExec *BlockExecutor) ApplyBlock(state State, blockID types.BlockID, b
 		return state, ErrInvalidBlock(err)
 	}
 
-	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, state.LastValidators, blockExec.db)
+	abciResponses, err := execBlockOnProxyApp(blockExec.logger, blockExec.proxyApp, block, state.LastValidators, state.Validators, blockExec.db)
 	if err != nil {
 		return state, ErrProxyAppConn(err)
 	}
@@ -158,7 +158,7 @@ func (blockExec *BlockExecutor) Commit(block *types.Block) ([]byte, error) {
 // Executes block's transactions on proxyAppConn.
 // Returns a list of transaction results and updates to the validator set
 func execBlockOnProxyApp(logger log.Logger, proxyAppConn proxy.AppConnConsensus,
-	block *types.Block, lastValSet *types.ValidatorSet, stateDB dbm.DB) (*ABCIResponses, error) {
+	block *types.Block, lastValSet *types.ValidatorSet, valSet *types.ValidatorSet, stateDB dbm.DB) (*ABCIResponses, error) {
 	var validTxs, invalidTxs = 0, 0
 
 	txIndex := 0
@@ -189,7 +189,7 @@ func execBlockOnProxyApp(logger log.Logger, proxyAppConn proxy.AppConnConsensus,
 	// Begin block
 	_, err := proxyAppConn.BeginBlockSync(abci.RequestBeginBlock{
 		Hash:                block.Hash(),
-		Header:              types.TM2PB.Header(&block.Header),
+		Header:              types.TM2PB.Header(&block.Header, valSet.GetProposer()),
 		Validators:          signVals,
 		ByzantineValidators: byzVals,
 	})
@@ -385,8 +385,8 @@ func fireEvents(logger log.Logger, eventBus types.BlockEventPublisher, block *ty
 // ExecCommitBlock executes and commits a block on the proxyApp without validating or mutating the state.
 // It returns the application root hash (result of abci.Commit).
 func ExecCommitBlock(appConnConsensus proxy.AppConnConsensus, block *types.Block,
-	logger log.Logger, lastValSet *types.ValidatorSet, stateDB dbm.DB) ([]byte, error) {
-	_, err := execBlockOnProxyApp(logger, appConnConsensus, block, lastValSet, stateDB)
+	logger log.Logger, lastValSet *types.ValidatorSet, valSet *types.ValidatorSet, stateDB dbm.DB) ([]byte, error) {
+	_, err := execBlockOnProxyApp(logger, appConnConsensus, block, lastValSet, valSet, stateDB)
 	if err != nil {
 		logger.Error("Error executing block on proxy app", "height", block.Height, "err", err)
 		return nil, err
